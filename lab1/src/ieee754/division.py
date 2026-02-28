@@ -24,7 +24,6 @@ def divide_ieee754(a: BinaryNumber, b: BinaryNumber) -> BinaryNumber:
     s_res = s1 ^ s2
     e_res = e1 - e2
 
-    # Для получения 24 бит точности дробной части, сдвигаем делимое на 24 бита влево
     val1 = _bits_to_int(m1) << 24
     val2 = _bits_to_int(m2)
 

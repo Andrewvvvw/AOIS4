@@ -9,7 +9,6 @@ def add_gray_bcd(a: BinaryNumber, b: BinaryNumber) -> BinaryNumber:
     res_nibbles = []
     nibbles_a = [a.bits[i:i + 4] for i in range(0, BIT_COUNT, 4)]
     nibbles_b = [b.bits[i:i + 4] for i in range(0, BIT_COUNT, 4)]
-
     for i in range((BIT_COUNT // 4) - 1, -1, -1):
         val_a = _gray_to_digit(nibbles_a[i])
         val_b = _gray_to_digit(nibbles_b[i])
