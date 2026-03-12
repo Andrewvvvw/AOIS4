@@ -1,6 +1,6 @@
 from typing import List
 from src.models import BinaryNumber
-from src.config import ZERO_BIT
+from src.config import ZERO_BIT, BIT_COUNT, EXPONENT_BITS, MANTISSA_SIZE
 from src.ieee754.utils import unpack_ieee754, pack_ieee754
 
 
@@ -19,15 +19,15 @@ def divide_ieee754(a: BinaryNumber, b: BinaryNumber) -> BinaryNumber:
     if not any(m2):
         raise ZeroDivisionError("IEEE-754 Division by zero")
     if not any(m1):
-        return BinaryNumber([s1 ^ s2] + [ZERO_BIT] * 31)
+        return BinaryNumber([s1 ^ s2] + [ZERO_BIT] * (BIT_COUNT - 1))
 
     s_res = s1 ^ s2
     e_res = e1 - e2
 
-    val1 = _bits_to_int(m1) << 24
+    val1 = _bits_to_int(m1) << MANTISSA_SIZE + 1
     val2 = _bits_to_int(m2)
 
     quotient = val1 // val2
-    m_res = _int_to_bits(quotient, 25)
+    m_res = _int_to_bits(quotient, BIT_COUNT - EXPONENT_BITS + 1)
 
     return pack_ieee754(s_res, e_res, m_res)

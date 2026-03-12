@@ -12,7 +12,7 @@ from src.ieee754.multiplication import multiply_ieee754
 from src.ieee754.division import divide_ieee754
 from src.gray_bcd.converters import decimal_to_gray_bcd, gray_bcd_to_decimal
 from src.gray_bcd.addition import add_gray_bcd
-
+from src.config import BCD_DECAD_SIZE, MANTISSA_START
 
 def format_bin(bn: BinaryNumber) -> str:
     return "".join(map(str, bn.bits))
@@ -20,12 +20,12 @@ def format_bin(bn: BinaryNumber) -> str:
 
 def format_ieee(bn: BinaryNumber) -> str:
     b = format_bin(bn)
-    return f"{b[0]} {b[1:9]} {b[9:]}"
+    return f"{b[0]} {b[1:MANTISSA_START]} {b[MANTISSA_START:]}"
 
 
 def format_bcd(bn: BinaryNumber) -> str:
     b = format_bin(bn)
-    return " ".join(b[i:i + 4] for i in range(0, len(b), 4))
+    return " ".join(b[i:i + BCD_DECAD_SIZE] for i in range(0, len(b), BCD_DECAD_SIZE))
 
 
 def get_int(prompt: str) -> int:
@@ -83,8 +83,7 @@ def main():
                 res = add_binary(a, b)
                 print(f"\n[{format_bin(a)}] ({v1})")
                 print(f"+")
-                print(f"[{format_bin(b)}] ({v2})")
-                print("-" * 40)
+                print(f"[{format_bin(b)}] ({v2})\n")
                 print(f"[{format_bin(res)}] -> {additional_to_decimal(res)} (10-й формат)")
 
             elif choice == '3':

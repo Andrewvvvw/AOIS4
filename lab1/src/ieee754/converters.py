@@ -1,9 +1,18 @@
 from typing import List, Tuple
 from src.models import BinaryNumber
-from src.config import BIT_COUNT, ZERO_BIT, ONE_BIT
+from src.config import (
+    BIT_COUNT,
+    ZERO_BIT,
+    ONE_BIT,
+    MANTISSA_SIZE,
+    BASE_BIAS,
+    EXPONENT_BITS,
+    EXPONENT_START,
+    MANTISSA_START,
+    FRACTION_LIMIT
+)
 
-
-def _get_fraction_bits(fraction: float, limit: int = 50) -> List[int]:
+def _get_fraction_bits(fraction: float, limit: int = FRACTION_LIMIT) -> List[int]:
     bits = []
     current = fraction
     for _ in range(limit):
@@ -38,8 +47,8 @@ def _normalize(int_bits: List[int], frac_bits: List[int]) -> Tuple[int, List[int
         except ValueError:
             return 0, []
 
-    mantissa = mantissa[:23]
-    return exponent, mantissa + [ZERO_BIT] * (23 - len(mantissa))
+    mantissa = mantissa[:MANTISSA_SIZE]
+    return exponent, mantissa + [ZERO_BIT] * (MANTISSA_SIZE - len(mantissa))
 
 
 def float_to_ieee754(value: float) -> BinaryNumber:
@@ -54,24 +63,24 @@ def float_to_ieee754(value: float) -> BinaryNumber:
 
     exponent_val, mantissa = _normalize(int_bits, frac_bits)
 
-    biased_exponent = exponent_val + 127
+    biased_exponent = exponent_val + BASE_BIAS
     exp_bits = _get_integer_bits(biased_exponent)
-    exp_bits = [ZERO_BIT] * (8 - len(exp_bits)) + exp_bits
+    exp_bits = [ZERO_BIT] * (EXPONENT_BITS - len(exp_bits)) + exp_bits
 
     return BinaryNumber([sign] + exp_bits + mantissa)
 
 
 def ieee754_to_float(binary: BinaryNumber) -> float:
     sign = binary[0]
-    exp_bits = binary.bits[1:9]
-    mantissa_bits = binary.bits[9:]
+    exp_bits = binary.bits[EXPONENT_START:MANTISSA_START]
+    mantissa_bits = binary.bits[MANTISSA_START:]
 
     exp_val = sum(bit * (2 ** i) for i, bit in enumerate(reversed(exp_bits)))
 
     if exp_val == 0 and not any(mantissa_bits):
         return 0.0
 
-    real_exp = exp_val - 127
+    real_exp = exp_val - BASE_BIAS
     mantissa_val = 1.0
     for i, bit in enumerate(mantissa_bits):
         mantissa_val += bit * (2 ** -(i + 1))
