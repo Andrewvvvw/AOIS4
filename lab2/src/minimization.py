@@ -32,43 +32,26 @@ class GluingStage:
 
 @dataclass(frozen=True)
 class MinimizationResult:
+    form: str
     variables: tuple[str, ...]
-    minterms: tuple[int, ...]
+    term_indexes: tuple[int, ...]
     stages: tuple[GluingStage, ...]
     prime_implicants: tuple[Implicant, ...]
     selected_implicants: tuple[Implicant, ...]
     minimized_expression: str
 
+    @property
+    def minterms(self) -> tuple[int, ...]:
+        """Backward-compatible alias for existing SDNF-oriented callers."""
+        return self.term_indexes
+
 
 def minimize_sdnf_calculation(table: TruthTable) -> MinimizationResult:
-    variables = table.variables
-    minterms = tuple(index for index, row in enumerate(table.rows) if row.result)
+    return _minimize_calculation(table, form="SDNF")
 
-    if not minterms:
-        return MinimizationResult(
-            variables=variables,
-            minterms=minterms,
-            stages=tuple(),
-            prime_implicants=tuple(),
-            selected_implicants=tuple(),
-            minimized_expression="0",
-        )
 
-    initial_implicants = tuple(
-        _implicant_from_minterm(index, len(variables)) for index in minterms
-    )
-    stages, prime_implicants = _build_gluing_stages(initial_implicants)
-    selected_implicants = _select_cover(prime_implicants, set(minterms), len(variables))
-    expression = _implicants_to_expression(selected_implicants, variables)
-
-    return MinimizationResult(
-        variables=variables,
-        minterms=minterms,
-        stages=stages,
-        prime_implicants=prime_implicants,
-        selected_implicants=selected_implicants,
-        minimized_expression=expression,
-    )
+def minimize_sknf_calculation(table: TruthTable) -> MinimizationResult:
+    return _minimize_calculation(table, form="SKNF")
 
 
 def minimize_sdnf_calculation_from_expression(expression: str) -> MinimizationResult:
@@ -76,31 +59,75 @@ def minimize_sdnf_calculation_from_expression(expression: str) -> MinimizationRe
     return minimize_sdnf_calculation(table)
 
 
+def minimize_sknf_calculation_from_expression(expression: str) -> MinimizationResult:
+    table = build_truth_table(expression)
+    return minimize_sknf_calculation(table)
+
+
 def format_minimization_report(result: MinimizationResult) -> str:
     lines = ["Calculation method"]
-    if not result.minterms:
-        lines.append("SDNF is empty -> minimized: 0")
+    if not result.term_indexes:
+        empty_value = "0" if result.form == "SDNF" else "1"
+        lines.append(f"{result.form} is empty -> minimized: {empty_value}")
         return "\n".join(lines)
 
-    lines.append(f"Minterms: {', '.join(str(value) for value in result.minterms)}")
+    label = "Minterms" if result.form == "SDNF" else "Maxterms"
+    join_symbol = " + " if result.form == "SDNF" else " * "
+    lines.append(f"{label}: {', '.join(str(value) for value in result.term_indexes)}")
     for stage_number, stage in enumerate(result.stages, start=1):
         lines.append(f"Gluing stage {stage_number}")
         if not stage.gluing_records:
             lines.append("  no pairs to glue")
         for record in stage.gluing_records:
-            left = _implicant_to_term(record.left.pattern, result.variables)
-            right = _implicant_to_term(record.right.pattern, result.variables)
-            glued = _implicant_to_term(record.result.pattern, result.variables)
-            lines.append(f"  {left} + {right} -> {glued}")
-        stage_result = _implicants_to_expression(stage.result_implicants, result.variables)
+            left = _implicant_to_term(record.left.pattern, result.variables, result.form)
+            right = _implicant_to_term(record.right.pattern, result.variables, result.form)
+            glued = _implicant_to_term(record.result.pattern, result.variables, result.form)
+            lines.append(f"  {left}{join_symbol}{right} -> {glued}")
+        stage_result = _implicants_to_expression(stage.result_implicants, result.variables, result.form)
         lines.append(f"  result: {stage_result}")
 
     lines.append(
         "Prime implicants: "
-        + _implicants_to_expression(result.prime_implicants, result.variables)
+        + _implicants_to_expression(result.prime_implicants, result.variables, result.form)
     )
-    lines.append(f"Minimized SDNF: {result.minimized_expression}")
+    lines.append(f"Minimized {result.form}: {result.minimized_expression}")
     return "\n".join(lines)
+
+
+def _minimize_calculation(table: TruthTable, form: str) -> MinimizationResult:
+    variables = table.variables
+    if form == "SDNF":
+        term_indexes = tuple(index for index, row in enumerate(table.rows) if row.result)
+    else:
+        term_indexes = tuple(index for index, row in enumerate(table.rows) if not row.result)
+
+    if not term_indexes:
+        return MinimizationResult(
+            form=form,
+            variables=variables,
+            term_indexes=term_indexes,
+            stages=tuple(),
+            prime_implicants=tuple(),
+            selected_implicants=tuple(),
+            minimized_expression="0" if form == "SDNF" else "1",
+        )
+
+    initial_implicants = tuple(
+        _implicant_from_minterm(index, len(variables)) for index in term_indexes
+    )
+    stages, prime_implicants = _build_gluing_stages(initial_implicants)
+    selected_implicants = _select_cover(prime_implicants, set(term_indexes), len(variables))
+    expression = _implicants_to_expression(selected_implicants, variables, form)
+
+    return MinimizationResult(
+        form=form,
+        variables=variables,
+        term_indexes=term_indexes,
+        stages=stages,
+        prime_implicants=prime_implicants,
+        selected_implicants=selected_implicants,
+        minimized_expression=expression,
+    )
 
 
 def _implicant_from_minterm(index: int, variable_count: int) -> Implicant:
@@ -331,30 +358,43 @@ def _total_literals(implicants: tuple[Implicant, ...]) -> int:
 def _implicants_to_expression(
     implicants: Iterable[Implicant],
     variables: tuple[str, ...],
+    form: str,
 ) -> str:
-    terms = [_implicant_to_term(implicant.pattern, variables) for implicant in implicants]
+    terms = [_implicant_to_term(implicant.pattern, variables, form) for implicant in implicants]
     if not terms:
+        return "0" if form == "SDNF" else "1"
+    if form == "SDNF":
+        if all(term == "1" for term in terms):
+            return "1"
+        return " | ".join(terms)
+    if all(term == "0" for term in terms):
         return "0"
-    if all(term == "1" for term in terms):
-        return "1"
-    return " | ".join(terms)
+    return " & ".join(terms)
 
 
 def _implicant_to_term(
     pattern: tuple[Optional[int], ...],
     variables: tuple[str, ...],
+    form: str,
 ) -> str:
     literals: list[str] = []
     for variable, bit in zip(variables, pattern):
         if bit is None:
             continue
-        if bit == BIT_ONE:
-            literals.append(variable)
+        if form == "SDNF":
+            literals.append(variable if bit == BIT_ONE else f"!{variable}")
         else:
-            literals.append(f"!{variable}")
+            literals.append(f"!{variable}" if bit == BIT_ONE else variable)
+
+    if form == "SDNF":
+        if not literals:
+            return "1"
+        if len(literals) == 1:
+            return literals[0]
+        return f"({' & '.join(literals)})"
 
     if not literals:
-        return "1"
+        return "0"
     if len(literals) == 1:
         return literals[0]
-    return f"({' & '.join(literals)})"
+    return f"({' | '.join(literals)})"

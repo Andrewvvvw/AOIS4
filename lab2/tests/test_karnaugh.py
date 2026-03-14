@@ -4,6 +4,8 @@ from src.karnaugh import (
     format_karnaugh_report,
     minimize_sdnf_karnaugh,
     minimize_sdnf_karnaugh_from_expression,
+    minimize_sknf_karnaugh,
+    minimize_sknf_karnaugh_from_expression,
 )
 from src.truth_table import build_truth_table
 
@@ -40,6 +42,22 @@ class KarnaughTests(unittest.TestCase):
         self.assertIn("Karnaugh map method", report)
         self.assertIn("rows\\cols", report)
         self.assertIn("Minimized SDNF", report)
+
+    def test_karnaugh_sknf_minimizes_to_a_or_b_and_a_or_c(self) -> None:
+        result = minimize_sknf_karnaugh_from_expression("a | (b & c)")
+
+        self.assertEqual(result.minimized_expression, "(a | b) & (a | c)")
+
+    def test_karnaugh_sknf_constant_one(self) -> None:
+        result = minimize_sknf_karnaugh(build_truth_table("1"))
+
+        self.assertEqual(result.minimized_expression, "1")
+
+    def test_karnaugh_sknf_report_contains_label(self) -> None:
+        result = minimize_sknf_karnaugh_from_expression("a | (b & c)")
+        report = format_karnaugh_report(result)
+
+        self.assertIn("Minimized SKNF", report)
 
 
 if __name__ == "__main__":

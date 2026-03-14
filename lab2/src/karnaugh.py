@@ -23,15 +23,29 @@ class KarnaughMap:
 
 @dataclass(frozen=True)
 class KarnaughMinimizationResult:
+    form: str
     variables: tuple[str, ...]
-    minterms: tuple[int, ...]
+    term_indexes: tuple[int, ...]
     kmap: KarnaughMap
     prime_implicants: tuple[Implicant, ...]
     selected_implicants: tuple[Implicant, ...]
     minimized_expression: str
 
+    @property
+    def minterms(self) -> tuple[int, ...]:
+        """Backward-compatible alias for existing SDNF-oriented callers."""
+        return self.term_indexes
+
 
 def minimize_sdnf_karnaugh(table: TruthTable) -> KarnaughMinimizationResult:
+    return _minimize_karnaugh(table, form="SDNF")
+
+
+def minimize_sknf_karnaugh(table: TruthTable) -> KarnaughMinimizationResult:
+    return _minimize_karnaugh(table, form="SKNF")
+
+
+def _minimize_karnaugh(table: TruthTable, form: str) -> KarnaughMinimizationResult:
     variable_count = len(table.variables)
     if variable_count > MAX_KARNAUGH_VARIABLES:
         raise ValueError(
@@ -39,39 +53,48 @@ def minimize_sdnf_karnaugh(table: TruthTable) -> KarnaughMinimizationResult:
         )
 
     kmap = _build_karnaugh_map(table)
-    minterms = tuple(index for index, row in enumerate(table.rows) if row.result)
-    if not minterms:
+    target_value = 1 if form == "SDNF" else 0
+    term_indexes = tuple(
+        index
+        for index, row in enumerate(table.rows)
+        if (1 if row.result else 0) == target_value
+    )
+
+    if not term_indexes:
         return KarnaughMinimizationResult(
+            form=form,
             variables=table.variables,
-            minterms=minterms,
+            term_indexes=term_indexes,
             kmap=kmap,
             prime_implicants=tuple(),
             selected_implicants=tuple(),
-            minimized_expression="0",
+            minimized_expression="0" if form == "SDNF" else "1",
         )
 
-    if len(minterms) == len(table.rows):
-        one_implicant = Implicant(
+    if len(term_indexes) == len(table.rows):
+        universal_implicant = Implicant(
             pattern=tuple(None for _ in table.variables),
-            covered_minterms=minterms,
+            covered_minterms=term_indexes,
         )
         return KarnaughMinimizationResult(
+            form=form,
             variables=table.variables,
-            minterms=minterms,
+            term_indexes=term_indexes,
             kmap=kmap,
-            prime_implicants=(one_implicant,),
-            selected_implicants=(one_implicant,),
-            minimized_expression="1",
+            prime_implicants=(universal_implicant,),
+            selected_implicants=(universal_implicant,),
+            minimized_expression="1" if form == "SDNF" else "0",
         )
 
-    groups = _all_one_groups(kmap)
+    groups = _all_groups(kmap, target_value)
     prime_implicants = _groups_to_prime_implicants(groups, len(table.variables))
-    selected = _select_cover(prime_implicants, set(minterms), len(table.variables))
-    expression = _implicants_to_expression(selected, table.variables)
+    selected = _select_cover(prime_implicants, set(term_indexes), len(table.variables))
+    expression = _implicants_to_expression(selected, table.variables, form)
 
     return KarnaughMinimizationResult(
+        form=form,
         variables=table.variables,
-        minterms=minterms,
+        term_indexes=term_indexes,
         kmap=kmap,
         prime_implicants=prime_implicants,
         selected_implicants=selected,
@@ -84,6 +107,11 @@ def minimize_sdnf_karnaugh_from_expression(expression: str) -> KarnaughMinimizat
     return minimize_sdnf_karnaugh(table)
 
 
+def minimize_sknf_karnaugh_from_expression(expression: str) -> KarnaughMinimizationResult:
+    table = build_truth_table(expression)
+    return minimize_sknf_karnaugh(table)
+
+
 def format_karnaugh_report(result: KarnaughMinimizationResult) -> str:
     lines = ["Karnaugh map method"]
     lines.append(
@@ -92,13 +120,13 @@ def format_karnaugh_report(result: KarnaughMinimizationResult) -> str:
     lines.extend(_format_map_table(result.kmap))
     lines.append(
         "Prime implicants: "
-        + _implicants_to_expression(result.prime_implicants, result.variables)
+        + _implicants_to_expression(result.prime_implicants, result.variables, result.form)
     )
     lines.append(
         "Selected implicants: "
-        + _implicants_to_expression(result.selected_implicants, result.variables)
+        + _implicants_to_expression(result.selected_implicants, result.variables, result.form)
     )
-    lines.append(f"Minimized SDNF: {result.minimized_expression}")
+    lines.append(f"Minimized {result.form}: {result.minimized_expression}")
     return "\n".join(lines)
 
 
@@ -146,7 +174,7 @@ def _gray_codes(bit_count: int) -> list[str]:
     return [format(number ^ (number >> 1), f"0{bit_count}b") for number in range(1 << bit_count)]
 
 
-def _all_one_groups(kmap: KarnaughMap) -> tuple[tuple[int, ...], ...]:
+def _all_groups(kmap: KarnaughMap, target_value: int) -> tuple[tuple[int, ...], ...]:
     row_count = len(kmap.values)
     col_count = len(kmap.values[0]) if row_count > 0 else 0
     row_sizes = _powers_of_two(row_count)
@@ -165,7 +193,7 @@ def _all_one_groups(kmap: KarnaughMap) -> tuple[tuple[int, ...], ...]:
                         row_index = (start_row + row_offset) % row_count
                         for col_offset in range(width):
                             col_index = (start_col + col_offset) % col_count
-                            if kmap.values[row_index][col_index] != 1:
+                            if kmap.values[row_index][col_index] != target_value:
                                 all_ones = False
                                 break
                             minterms.append(kmap.minterms[row_index][col_index])
@@ -368,33 +396,46 @@ def _total_literals(implicants: Iterable[Implicant]) -> int:
 def _implicants_to_expression(
     implicants: Iterable[Implicant],
     variables: tuple[str, ...],
+    form: str,
 ) -> str:
-    terms = [_implicant_to_term(implicant.pattern, variables) for implicant in implicants]
+    terms = [_implicant_to_term(implicant.pattern, variables, form) for implicant in implicants]
     if not terms:
+        return "0" if form == "SDNF" else "1"
+    if form == "SDNF":
+        if all(term == "1" for term in terms):
+            return "1"
+        return " | ".join(terms)
+    if all(term == "0" for term in terms):
         return "0"
-    if all(term == "1" for term in terms):
-        return "1"
-    return " | ".join(terms)
+    return " & ".join(terms)
 
 
 def _implicant_to_term(
     pattern: tuple[Optional[int], ...],
     variables: tuple[str, ...],
+    form: str,
 ) -> str:
     literals = []
     for variable, bit in zip(variables, pattern):
         if bit is None:
             continue
-        if bit == 1:
-            literals.append(variable)
+        if form == "SDNF":
+            literals.append(variable if bit == 1 else f"!{variable}")
         else:
-            literals.append(f"!{variable}")
+            literals.append(f"!{variable}" if bit == 1 else variable)
+
+    if form == "SDNF":
+        if not literals:
+            return "1"
+        if len(literals) == 1:
+            return literals[0]
+        return f"({' & '.join(literals)})"
 
     if not literals:
-        return "1"
+        return "0"
     if len(literals) == 1:
         return literals[0]
-    return f"({' & '.join(literals)})"
+    return f"({' | '.join(literals)})"
 
 
 def _format_map_table(kmap: KarnaughMap) -> list[str]:

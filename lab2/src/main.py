@@ -4,14 +4,23 @@ from .boolean_derivatives import build_all_derivatives
 from .canonical_forms import build_canonical_forms
 from .dummy_variables import find_dummy_variables
 from .index_form import build_index_form
-from .karnaugh import format_karnaugh_report, minimize_sdnf_karnaugh
+from .karnaugh import (
+    format_karnaugh_report,
+    minimize_sdnf_karnaugh,
+    minimize_sknf_karnaugh,
+)
 from .logic_parser import LogicSyntaxError, parse_logical_expression
-from .minimization import format_minimization_report, minimize_sdnf_calculation
+from .minimization import (
+    format_minimization_report,
+    minimize_sdnf_calculation,
+    minimize_sknf_calculation,
+)
 from .numeric_forms import build_numeric_forms
 from .post_classes import analyze_post_classes
 from .tabular_minimization import (
     format_tabular_minimization_report,
     minimize_sdnf_tabular,
+    minimize_sknf_tabular,
 )
 from .truth_table import TruthTable, build_truth_table
 from .zhegalkin import build_zhegalkin_polynomial
@@ -75,15 +84,24 @@ def main() -> int:
         variables_part = ",".join(derivative.derivative_variables)
         print(f"d[{variables_part}] = {derivative.expression}")
 
-    minimization = minimize_sdnf_calculation(table)
-    print(format_minimization_report(minimization), "\n")
+    minimization_sdnf = minimize_sdnf_calculation(table)
+    print(format_minimization_report(minimization_sdnf), "\n")
 
-    tabular_minimization = minimize_sdnf_tabular(table)
-    print(format_tabular_minimization_report(tabular_minimization), "\n")
+    minimization_sknf = minimize_sknf_calculation(table)
+    print(format_minimization_report(minimization_sknf), "\n")
+
+    tabular_minimization_sdnf = minimize_sdnf_tabular(table)
+    print(format_tabular_minimization_report(tabular_minimization_sdnf), "\n")
+
+    tabular_minimization_sknf = minimize_sknf_tabular(table)
+    print(format_tabular_minimization_report(tabular_minimization_sknf), "\n")
 
     try:
-        karnaugh_minimization = minimize_sdnf_karnaugh(table)
-        print(format_karnaugh_report(karnaugh_minimization))
+        karnaugh_sdnf = minimize_sdnf_karnaugh(table)
+        print(format_karnaugh_report(karnaugh_sdnf), "\n")
+
+        karnaugh_sknf = minimize_sknf_karnaugh(table)
+        print(format_karnaugh_report(karnaugh_sknf))
     except ValueError as error:
         print(f"Karnaugh map method: {error}")
     return 0
