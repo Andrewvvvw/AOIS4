@@ -325,41 +325,41 @@
     <a name="circuitnamedboxfixedsize" val="true"/>
     <a name="simulationFrequency" val="1.0"/>
     <comp lib="0" loc="(110,120)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="label" val="I1"/>
     </comp>
     <comp lib="0" loc="(110,150)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="label" val="I0"/>
     </comp>
     <comp lib="0" loc="(110,60)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="label" val="I3"/>
     </comp>
     <comp lib="0" loc="(110,90)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="label" val="I2"/>
     </comp>
     <comp lib="0" loc="(490,120)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="facing" val="west"/>
       <a name="label" val="O1"/>
       <a name="type" val="output"/>
     </comp>
     <comp lib="0" loc="(490,150)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="facing" val="west"/>
       <a name="label" val="O0"/>
       <a name="type" val="output"/>
     </comp>
     <comp lib="0" loc="(490,60)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="facing" val="west"/>
       <a name="label" val="O3"/>
       <a name="type" val="output"/>
     </comp>
     <comp lib="0" loc="(490,90)" name="Pin">
-      <a name="appearance" val="NewPins"/>
+      <a name="appearance" val="classic"/>
       <a name="facing" val="west"/>
       <a name="label" val="O2"/>
       <a name="type" val="output"/>
